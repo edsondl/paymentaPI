@@ -1,0 +1,111 @@
+package com.paymentapi.paymentapi.controller;
+
+import com.paymentapi.paymentapi.model.Client;
+import com.paymentapi.paymentapi.service.interfaces.ClientService;
+import io.swagger.annotations.*;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Example;
+import org.springframework.data.domain.ExampleMatcher;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
+
+import javax.validation.Valid;
+import java.util.List;
+import java.util.Optional;
+
+@RestController
+@RequiredArgsConstructor
+@RequestMapping(value = "/api/clients")
+@Api("Api Clients")
+public class ClientController {
+
+    @Autowired
+    private ClientService clientService;
+
+    @PutMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @ApiOperation("Updated a client by id")
+    @ApiResponses({
+            @ApiResponse(code = 200, message = "Client updated successfully"),
+            @ApiResponse(code = 400, message = "Validation Error"),
+            @ApiResponse(code = 404, message = "Client not found by the given id"),
+    })
+    public Client updateById(@PathVariable Integer id,
+                             @RequestBody @Valid Client client) {
+        return clientService.findById(id)
+                .map(c -> {
+                    client.setId(c.getId());
+                    clientService.save(client);
+                    return client;
+                }).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Client not found"));
+    }
+
+    @GetMapping
+    @ApiOperation("Search all clients")
+    @ApiResponses({
+            @ApiResponse(code = 200, message = "Clients found successfully"),
+            @ApiResponse(code = 404, message = "Clients not found"),
+    })
+    public ResponseEntity<Page<Client>> findAll(@PageableDefault(size = 5)  Pageable pageable, Client filter) {
+        ExampleMatcher matcher = ExampleMatcher
+                .matching()
+                .withIgnoreCase()
+                .withStringMatcher(
+                        ExampleMatcher.StringMatcher.CONTAINING);
+        Example example = Example.of(filter, matcher);
+        Page<Client> clients = clientService.findAll(example, pageable);
+        return ResponseEntity.ok(clients);
+    }
+
+    @GetMapping("/{id}")
+    @ApiOperation("Search for a client by id")
+    @ApiResponses({
+            @ApiResponse(code = 200, message = "Client found successfully"),
+            @ApiResponse(code = 404, message = "Client not found by the given id"),
+    })
+    public ResponseEntity findById(@PathVariable Integer id) {
+        Optional<Client> client = clientService.findById(id);
+        return client.map(value -> new ResponseEntity(value, HttpStatus.OK)).orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/byName/{name}")
+    @ApiOperation("Search for a client by name")
+    @ApiResponses({
+            @ApiResponse(code = 200, message = "Client found successfully"),
+            @ApiResponse(code = 404, message = "Client not found by the given name"),
+    })
+    public ResponseEntity<Page<Client>> findByName(@PathVariable String name, @PageableDefault(size = 5) Pageable pageable) {
+        Page<Client> clients = clientService.findByName(name, pageable);
+        return ResponseEntity.ok(clients);
+    }
+
+    @PostMapping
+    @ApiOperation("Save a new client")
+    @ApiResponses({
+            @ApiResponse(code = 201, message = "Client saved successfully"),
+            @ApiResponse(code = 400, message = "Validation Error"),
+    })
+    public ResponseEntity<Client> save(@RequestBody @Valid Client client) {
+        return new ResponseEntity<>(clientService.save(client), HttpStatus.CREATED);
+    }
+
+    @DeleteMapping("/{id}")
+    @ApiOperation("Delete a client by id")
+    @ApiResponses({
+            @ApiResponse(code = 200, message = "Client found successfully"),
+            @ApiResponse(code = 404, message = "Client not found by the given id"),
+    })
+    public ResponseEntity deleteById(@PathVariable Integer id) {
+        if (clientService.findById(id).isPresent()) {
+            clientService.deleteById(id);
+            return ResponseEntity.ok().build();
+        }
+        return ResponseEntity.notFound().build();
+    }
+}
